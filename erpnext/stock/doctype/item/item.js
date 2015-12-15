@@ -10,15 +10,30 @@ frappe.ui.form.on("Item", {
 			frm.fields_dict["attributes"].grid.set_column_disp("attribute_value", true);
 		}
 
+		// should never check Private
+		frm.fields_dict["website_image"].df.is_private = 0;
+
 	},
 
 	refresh: function(frm) {
 		if(frm.doc.is_stock_item) {
-			frm.add_custom_button(__("Show Balance"), function() {
+			frm.add_custom_button(__("Balance"), function() {
 				frappe.route_options = {
 					"item_code": frm.doc.name
 				}
 				frappe.set_route("query-report", "Stock Balance");
+			});
+			frm.add_custom_button(__("Ledger"), function() {
+				frappe.route_options = {
+					"item_code": frm.doc.name
+				}
+				frappe.set_route("query-report", "Stock Ledger");
+			});
+			frm.add_custom_button(__("Projected"), function() {
+				frappe.route_options = {
+					"item_code": frm.doc.name
+				}
+				frappe.set_route("query-report", "Stock Projected Qty");
 			});
 		}
 
@@ -87,6 +102,8 @@ frappe.ui.form.on("Item", {
 
 	is_stock_item: function(frm) {
 		erpnext.item.toggle_reqd(frm);
+		if(frm.doc.is_pro_applicable && !frm.doc.is_stock_item)
+			frm.set_value("is_pro_applicable", 0);
 	},
 
 	has_variants: function(frm) {

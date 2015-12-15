@@ -53,7 +53,7 @@ class Task(Document):
 
 	def update_total_expense_claim(self):
 		self.total_expense_claim = frappe.db.sql("""select sum(total_sanctioned_amount) from `tabExpense Claim`
-			where project = %s and task = %s and approval_status = "Approved" and docstatus=1""",(self.project, self.name))
+			where project = %s and task = %s and approval_status = "Approved" and docstatus=1""",(self.project, self.name))[0][0]
 
 	def update_time_and_costing(self):
 		tl = frappe.db.sql("""select min(from_time) as start_date, max(to_time) as end_date,
@@ -144,3 +144,9 @@ def set_multiple_status(names, status):
 		task = frappe.get_doc("Task", name)
 		task.status = status
 		task.save()
+
+def set_tasks_as_overdue():
+	frappe.db.sql("""update tabTask set `status`='Overdue'
+		where exp_end_date is not null
+		and exp_end_date < CURDATE()
+		and `status` not in ('Closed', 'Cancelled')""")

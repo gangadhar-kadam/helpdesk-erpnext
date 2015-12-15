@@ -47,8 +47,6 @@ class Item(WebsiteGenerator):
 
 		if not self.stock_uom:
 			msgprint(_("Please enter default Unit of Measure"), raise_exception=1)
-		if self.image and not self.website_image:
-			self.website_image = self.image
 
 		self.check_warehouse_is_set_for_stock_item()
 		self.validate_uom()
@@ -68,6 +66,7 @@ class Item(WebsiteGenerator):
 		self.validate_has_variants()
 		self.validate_attributes()
 		self.validate_variant_attributes()
+		self.validate_website_image()
 		self.make_thumbnail()
 
 		if not self.get("__islocal"):
@@ -82,6 +81,37 @@ class Item(WebsiteGenerator):
 		self.update_item_price()
 		self.update_variants()
 		self.update_template_item()
+
+	def validate_website_image(self):
+		"""Validate if the website image is a public file"""
+		auto_set_website_image = False
+		if not self.website_image and self.image:
+			auto_set_website_image = True
+			self.website_image = self.image
+
+		if not self.website_image:
+			return
+
+		# find if website image url exists as public
+		file = frappe.get_all("File", filters={
+			"file_url": self.website_image
+		}, fields=["name", "is_private"], order_by="is_private asc", limit_page_length=1)
+
+		if file:
+			file = file[0]
+
+		if not file:
+			if not auto_set_website_image:
+				frappe.msgprint(_("Website Image {0} attached to Item {1} cannot be found")
+					.format(self.website_image, self.name))
+
+			self.website_image = None
+
+		elif file.is_private:
+			if not auto_set_website_image:
+				frappe.msgprint(_("Website Image should be a public file or website URL"))
+
+			self.website_image = None
 
 	def make_thumbnail(self):
 		"""Make a thumbnail of `website_image`"""
@@ -105,7 +135,11 @@ class Item(WebsiteGenerator):
 				frappe.local.message_log.pop()
 
 			except requests.exceptions.HTTPError:
-				frappe.msgprint(_("Warning: Invalid Attachment {0}").format(self.website_image))
+				frappe.msgprint(_("Warning: Invalid attachment {0}").format(self.website_image))
+				self.website_image = None
+
+			except requests.exceptions.SSLError:
+				frappe.msgprint(_("Warning: Invalid SSL certificate on attachment {0}").format(self.website_image))
 				self.website_image = None
 
 			# for CSV import
@@ -307,7 +341,7 @@ class Item(WebsiteGenerator):
 
 	def validate_item_type(self):
 		if self.is_pro_applicable == 1 and self.is_stock_item==0:
-			frappe.throw(_("As Production Order can be made for this item, it must be a stock item."))
+			self.is_pro_applicable = 0
 
 		if self.has_serial_no == 1 and self.is_stock_item == 0:
 			msgprint(_("'Has Serial No' can not be 'Yes' for non-stock item"), raise_exception=1)
@@ -373,6 +407,13 @@ class Item(WebsiteGenerator):
 		if self.re_order_level or len(self.get("reorder_levels", {"material_request_type": "Purchase"})):
 			if not (self.is_purchase_item or self.is_pro_applicable):
 				frappe.throw(_("""To set reorder level, item must be a Purchase Item or Manufacturing Item"""))
+
+		if self.re_order_level and not self.re_order_qty:
+			frappe.throw(_("Please set reorder quantity"))
+		for d in self.get("reorder_levels"):
+			if d.warehouse_reorder_level and not d.warehouse_reorder_qty:
+				frappe.throw(_("Row #{0}: Please set reorder quantity").format(d.idx))
+
 
 	def validate_warehouse_for_reorder(self):
 		warehouse = []
@@ -658,7 +699,5 @@ def check_stock_uom_with_bin(item, stock_uom):
 			frappe.db.sql("""update tabBin set stock_uom=%s where item_code=%s""", (stock_uom, item))
 
 	if not matched:
-		frappe.throw(_("Default Unit of Measure for Item {0} cannot be changed directly because \
-			you have already made some transaction(s) with another UOM. To change default UOM, \
-			use 'UOM Replace Utility' tool under Stock module.").format(item))
+		frappe.throw(_("Default Unit of Measure for Item {0} cannot be changed directly because you have already made some transaction(s) with another UOM. You will need to create a new Item to use a different Default UOM.").format(item))
 
