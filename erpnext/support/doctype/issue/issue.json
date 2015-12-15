@@ -597,7 +597,7 @@
  "is_submittable": 0, 
  "issingle": 0, 
  "istable": 0, 
- "modified": "2015-10-19 03:04:49.729321", 
+ "modified": "2015-11-30 15:07:56.190015", 
  "modified_by": "Administrator", 
  "module": "Support", 
  "name": "Issue", 
@@ -641,6 +641,7 @@
    "set_user_permissions": 0, 
    "share": 1, 
    "submit": 0, 
+   "user_permission_doctypes": "[\"Department\"]", 
    "write": 1
   }
  ], 
